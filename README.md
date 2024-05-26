@@ -11,10 +11,10 @@ from scapy.layers.http import HTTPRequest
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 
-# Настройка логирования
+# Setting up logging
 logging.basicConfig(filename='ids.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 
-# Настройка отправки email
+# Setting up email sending
 def send_email_alert(subject, body):
     msg = MIMEText(body)
     msg['Subject'] = subject
@@ -26,7 +26,7 @@ def send_email_alert(subject, body):
         server.login('your_email@example.com', 'your_password')
         server.sendmail('your_email@example.com', ['admin@example.com'], msg.as_string())
 
-# Настройка Slack
+# Setting up Slack
 slack_client = WebClient(token='your_slack_token')
 def send_slack_alert(message):
     try:
@@ -34,10 +34,10 @@ def send_slack_alert(message):
     except SlackApiError as e:
         logging.error(f"Slack API error: {e.response['error']}")
 
-# Данные для машинного обучения
+# Data for Machine Learning
 packet_data = []
 
-# Функция для обработки пакетов
+# Function for processing packets
 def packet_handler(packet):
     global packet_data
     if IP in packet:
@@ -53,43 +53,43 @@ def packet_handler(packet):
                 url = http_layer[HTTPRequest].Host.decode() + http_layer[HTTPRequest].Path.decode()
                 logging.info(f"HTTP Request: {ip_src} -> {url}")
 
-                # Проверка на SQL-инъекцию
+                # Checking for SQL injection
                 if "SELECT" in http_layer[HTTPRequest].Path.decode().upper():
                     alert_message = f"Possible SQL Injection Attack from {ip_src} to {url}"
                     logging.warning(alert_message)
                     send_email_alert("Alert: SQL Injection Attack Detected", alert_message)
                     send_slack_alert(alert_message)
 
-                # Проверка на XSS
+                # Checking for XSS
                 if "<script>" in http_layer[HTTPRequest].Path.decode().lower():
                     alert_message = f"Possible XSS Attack from {ip_src} to {url}"
                     logging.warning(alert_message)
                     send_email_alert("Alert: XSS Attack Detected", alert_message)
                     send_slack_alert(alert_message)
 
-                # Проверка на RFI
+                # RFI check
                 if "http://" in http_layer[HTTPRequest].Path.decode().lower() or "https://" in http_layer[HTTPRequest].Path.decode().lower():
                     alert_message = f"Possible RFI Attack from {ip_src} to {url}"
                     logging.warning(alert_message)
                     send_email_alert("Alert: RFI Attack Detected", alert_message)
                     send_slack_alert(alert_message)
 
-# Запуск захвата пакетов
+# Running packet capture
 def start_sniffing():
     sniff(prn=packet_handler, store=0)
 
-# Обучение модели для обнаружения аномалий
+# Training a Model for Anomaly Detection
 def train_model():
     global packet_data
-    X = np.array(packet_data)[:,0].reshape(-1, 1)  # Используем только длину пакетов для простоты
+    X = np.array(packet_data)[:,0].reshape(-1, 1)  # We use only packet lengths for simplicity
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
     model = RandomForestClassifier(n_estimators=100)
-    model.fit(X_scaled, np.zeros(X_scaled.shape[0]))  # Используем dummy labels, так как это unsupervised learning
+    model.fit(X_scaled, np.zeros(X_scaled.shape[0]))  # We use dummy labels, since this is unsupervised learning
     return model, scaler
 
-# Функция для обнаружения аномалий
+# Anomaly detection function
 def detect_anomalies(model, scaler):
     global packet_data
     X = np.array(packet_data)[:,0].reshape(-1, 1)
@@ -105,13 +105,13 @@ def detect_anomalies(model, scaler):
             send_email_alert("Alert: Anomaly Detected", alert_message)
             send_slack_alert(alert_message)
 
-            # Запуск Metasploit для анализа атаки
+            # Running Metasploit to analyze the attack
             subprocess.run(["msfconsole", "-x", f"use auxiliary/scanner/http/sql_injection; set RHOSTS {ip_dst}; run"])
 
-            # Отправка данных в SIEM
+            # Sending data to SIEM
             send_to_siemon("IDS/IPS", "Anomaly Detected", alert_message)
 
-# Интеграция с SIEM
+# SIEM integration
 def send_to_siemon(source, event_type, message):
     siem_url = "http://your_siem_server/api/events"
     siem_token = "your_siem_token"
@@ -136,7 +136,7 @@ def send_to_siemon(source, event_type, message):
     except Exception as e:
         logging.error(f"Error occurred while sending data to SIEM: {str(e)}")
 
-# Главная функция
+# Main function
 def main():
     start_sniffing()
     model, scaler = train_model()
